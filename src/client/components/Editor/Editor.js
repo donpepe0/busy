@@ -2,28 +2,30 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import Helmet from 'react-helmet';
 import ReactDOM from 'react-dom';
-import readingTime from 'reading-time';
 import classNames from 'classnames';
 import { injectIntl, FormattedMessage } from 'react-intl';
-import { HotKeys } from 'react-hotkeys';
-import { throttle, isEqual } from 'lodash';
+import { isEqual } from 'lodash';
 import isArray from 'lodash/isArray';
-import { Icon, Checkbox, Form, Input, Select, Button } from 'antd';
-import Dropzone from 'react-dropzone';
-import { isValidImage, MAXIMUM_UPLOAD_SIZE } from '../../helpers/image';
+import { Checkbox, Form, Input, Select, Button } from 'antd';
 import { rewardsValues } from '../../../common/constants/rewards';
 import EditorToolbar from './EditorToolbar';
 import Action from '../Button/Action';
-import Body, { remarkable } from '../Story/Body';
+import Body from '../Story/Body';
 import requiresLogin from '../../auth/requiresLogin';
+import withEditor from './withEditor';
 import './Editor.less';
 
 @requiresLogin
+@Form.create()
 @injectIntl
+@withEditor
 class Editor extends React.Component {
   static propTypes = {
     intl: PropTypes.shape().isRequired,
     form: PropTypes.shape().isRequired,
+    htmlContent: PropTypes.string.isRequired,
+    editorInput: PropTypes.node.isRequired,
+    insertCode: PropTypes.func.isRequired,
     title: PropTypes.string,
     topics: PropTypes.arrayOf(PropTypes.string),
     body: PropTypes.string,
@@ -37,8 +39,6 @@ class Editor extends React.Component {
     onDelete: PropTypes.func,
     onSubmit: PropTypes.func,
     onError: PropTypes.func,
-    onImageInserted: PropTypes.func,
-    onImageInvalid: PropTypes.func,
   };
 
   static defaultProps = {
@@ -53,41 +53,17 @@ class Editor extends React.Component {
     isUpdating: false,
     saving: false,
     draftId: null,
-    onDelete: () => {},
     onUpdate: () => {},
+    onDelete: () => {},
     onSubmit: () => {},
     onError: () => {},
-    onImageInserted: () => {},
-    onImageInvalid: () => {},
-  };
-
-  static hotkeys = {
-    h1: 'ctrl+shift+1',
-    h2: 'ctrl+shift+2',
-    h3: 'ctrl+shift+3',
-    h4: 'ctrl+shift+4',
-    h5: 'ctrl+shift+5',
-    h6: 'ctrl+shift+6',
-    bold: 'ctrl+b',
-    italic: 'ctrl+i',
-    quote: 'ctrl+q',
-    link: 'ctrl+k',
-    image: 'ctrl+m',
   };
 
   state = {
-    contentHtml: '',
     noContent: false,
-    imageUploading: false,
-    dropzoneActive: false,
   };
 
   componentDidMount() {
-    if (this.input) {
-      this.input.addEventListener('input', throttle(e => this.renderMarkdown(e.target.value), 500));
-      this.input.addEventListener('paste', this.handlePastedImage);
-    }
-
     this.setValues(this.props);
 
     // eslint-disable-next-line react/no-find-dom-node
@@ -129,14 +105,6 @@ class Editor extends React.Component {
     });
   };
 
-  setInput = input => {
-    if (input && input.refs && input.refs.input) {
-      this.originalInput = input.refs.input;
-      // eslint-disable-next-line react/no-find-dom-node
-      this.input = ReactDOM.findDOMNode(input.refs.input);
-    }
-  };
-
   setValues = post => {
     this.props.form.setFieldsValue({
       title: post.title,
@@ -158,7 +126,6 @@ class Editor extends React.Component {
 
     const values = {
       ...this.props.form.getFieldsValue(['title', 'topics', 'reward', 'upvote']),
-      body: this.input.value,
     };
 
     if (!e) return values;
@@ -176,16 +143,6 @@ class Editor extends React.Component {
     }
 
     return values;
-  };
-
-  setInputCursorPosition = pos => {
-    if (this.input && this.input.setSelectionRange) {
-      this.input.setSelectionRange(pos, pos);
-    }
-  };
-
-  resizeTextarea = () => {
-    if (this.originalInput) this.originalInput.resizeTextarea();
   };
 
   //
@@ -241,211 +198,24 @@ class Editor extends React.Component {
   // Editor methods
   //
 
-  handlePastedImage = e => {
-    if (e.clipboardData && e.clipboardData.items) {
-      const items = e.clipboardData.items;
-      Array.from(items).forEach(item => {
-        if (item.kind === 'file') {
-          e.preventDefault();
-
-          const blob = item.getAsFile();
-
-          if (!isValidImage(blob)) {
-            this.props.onImageInvalid();
-            return;
-          }
-
-          this.setState({
-            imageUploading: true,
-          });
-
-          this.props.onImageInserted(blob, this.disableAndInsertImage, () =>
-            this.setState({
-              imageUploading: false,
-            }),
-          );
-        }
-      });
-    }
-  };
-
-  handleImageChange = e => {
-    if (e.target.files && e.target.files[0]) {
-      if (!isValidImage(e.target.files[0])) {
-        this.props.onImageInvalid();
-        return;
-      }
-
-      this.setState({
-        imageUploading: true,
-      });
-      this.props.onImageInserted(e.target.files[0], this.disableAndInsertImage, () =>
-        this.setState({
-          imageUploading: false,
-        }),
-      );
-      // Input reacts on value change, so if user selects the same file nothing will happen.
-      // We have to reset its value, so if same image is selected it will emit onChange event.
-      e.target.value = '';
-    }
-  };
-
-  handleDrop = files => {
-    if (files.length === 0) {
-      this.setState({
-        dropzoneActive: false,
-      });
-      return;
-    }
-
-    this.setState({
-      dropzoneActive: false,
-      imageUploading: true,
-    });
-    let callbacksCount = 0;
-    Array.from(files).forEach(item => {
-      this.props.onImageInserted(
-        item,
-        (image, imageName) => {
-          callbacksCount += 1;
-          this.insertImage(image, imageName);
-          if (callbacksCount === files.length) {
-            this.setState({
-              imageUploading: false,
-            });
-          }
-        },
-        () => {
-          this.setState({
-            imageUploading: false,
-          });
-        },
-      );
-    });
-  };
-
-  handleDragEnter = () => this.setState({ dropzoneActive: true });
-
-  handleDragLeave = () => this.setState({ dropzoneActive: false });
-
   handleDelete = e => {
     e.stopPropagation();
     e.preventDefault();
     this.props.onDelete();
   };
 
-  insertAtCursor = (before, after, deltaStart = 0, deltaEnd = 0) => {
-    if (!this.input) return;
-
-    const startPos = this.input.selectionStart;
-    const endPos = this.input.selectionEnd;
-    this.input.value =
-      this.input.value.substring(0, startPos) +
-      before +
-      this.input.value.substring(startPos, endPos) +
-      after +
-      this.input.value.substring(endPos, this.input.value.length);
-
-    this.input.selectionStart = startPos + deltaStart;
-    this.input.selectionEnd = endPos + deltaEnd;
-  };
-
-  disableAndInsertImage = (image, imageName = 'image') => {
-    this.setState({
-      imageUploading: false,
-    });
-    this.insertImage(image, imageName);
-  };
-
-  insertImage = (image, imageName = 'image') => {
-    if (!this.input) return;
-
-    const startPos = this.input.selectionStart;
-    const endPos = this.input.selectionEnd;
-    const imageText = `![${imageName}](${image})\n`;
-    this.input.value = `${this.input.value.substring(
-      0,
-      startPos,
-    )}${imageText}${this.input.value.substring(endPos, this.input.value.length)}`;
-    this.resizeTextarea();
-    this.renderMarkdown(this.input.value);
-    this.setInputCursorPosition(startPos + imageText.length);
-    this.onUpdate();
-  };
-
-  insertCode = type => {
-    if (!this.input) return;
-    this.input.focus();
-
-    switch (type) {
-      case 'h1':
-        this.insertAtCursor('# ', '', 2, 2);
-        break;
-      case 'h2':
-        this.insertAtCursor('## ', '', 3, 3);
-        break;
-      case 'h3':
-        this.insertAtCursor('### ', '', 4, 4);
-        break;
-      case 'h4':
-        this.insertAtCursor('#### ', '', 5, 5);
-        break;
-      case 'h5':
-        this.insertAtCursor('##### ', '', 6, 6);
-        break;
-      case 'h6':
-        this.insertAtCursor('###### ', '', 7, 7);
-        break;
-      case 'b':
-        this.insertAtCursor('**', '**', 2, 2);
-        break;
-      case 'i':
-        this.insertAtCursor('*', '*', 1, 1);
-        break;
-      case 'q':
-        this.insertAtCursor('> ', '', 2, 2);
-        break;
-      case 'link':
-        this.insertAtCursor('[', '](url)', 1, 1);
-        break;
-      case 'image':
-        this.insertAtCursor('![', '](url)', 2, 2);
-        break;
-      default:
-        break;
-    }
-
-    this.resizeTextarea();
-    this.renderMarkdown(this.input.value);
-    this.onUpdate();
-  };
-
-  handlers = {
-    h1: () => this.insertCode('h1'),
-    h2: () => this.insertCode('h2'),
-    h3: () => this.insertCode('h3'),
-    h4: () => this.insertCode('h4'),
-    h5: () => this.insertCode('h5'),
-    h6: () => this.insertCode('h6'),
-    bold: () => this.insertCode('b'),
-    italic: () => this.insertCode('i'),
-    quote: () => this.insertCode('q'),
-    link: e => {
-      e.preventDefault();
-      this.insertCode('link');
-    },
-    image: () => this.insertCode('image'),
-  };
-
-  renderMarkdown = value => {
-    this.setState({
-      contentHtml: remarkable.render(value),
-    });
-  };
-
   render() {
     const { getFieldDecorator } = this.props.form;
-    const { intl, loading, isUpdating, saving, draftId } = this.props;
+    const {
+      intl,
+      loading,
+      isUpdating,
+      saving,
+      draftId,
+      htmlContent,
+      editorInput,
+      insertCode,
+    } = this.props;
 
     return (
       <Form className="Editor" layout="vertical" onSubmit={this.handleSubmit}>
@@ -543,70 +313,10 @@ class Editor extends React.Component {
             })
           }
         >
-          <EditorToolbar onSelect={this.insertCode} />
-          <div className="Editor__dropzone-base">
-            <Dropzone
-              disableClick
-              style={{}}
-              accept="image/*"
-              maxSize={MAXIMUM_UPLOAD_SIZE}
-              onDropRejected={this.props.onImageInvalid}
-              onDrop={this.handleDrop}
-              onDragEnter={this.handleDragEnter}
-              onDragLeave={this.handleDragLeave}
-            >
-              {this.state.dropzoneActive && (
-                <div className="Editor__dropzone">
-                  <div>
-                    <i className="iconfont icon-picture" />
-                    <FormattedMessage id="drop_image" defaultMessage="Drop your images here" />
-                  </div>
-                </div>
-              )}
-              <HotKeys keyMap={Editor.hotkeys} handlers={this.handlers}>
-                <Input
-                  autosize={{ minRows: 6, maxRows: 12 }}
-                  onChange={this.onUpdate}
-                  ref={ref => this.setInput(ref)}
-                  type="textarea"
-                  placeholder={intl.formatMessage({
-                    id: 'story_placeholder',
-                    defaultMessage: 'Write your story...',
-                  })}
-                />
-              </HotKeys>
-            </Dropzone>
-          </div>
-          <p className="Editor__imagebox">
-            <input type="file" id="inputfile" accept="image/*" onChange={this.handleImageChange} />
-            <label htmlFor="inputfile">
-              {this.state.imageUploading ? (
-                <Icon type="loading" />
-              ) : (
-                <i className="iconfont icon-picture" />
-              )}
-              {this.state.imageUploading ? (
-                <FormattedMessage id="image_uploading" defaultMessage="Uploading your image..." />
-              ) : (
-                <FormattedMessage
-                  id="select_or_past_image"
-                  defaultMessage="Select image or paste it from the clipboard."
-                />
-              )}
-            </label>
-            <label htmlFor="reading_time" className="Editor__reading_time">
-              <FormattedMessage
-                id="reading_time"
-                defaultMessage={'{words} words / {min} min read'}
-                values={{
-                  words: readingTime(this.state.contentHtml).words,
-                  min: Math.ceil(readingTime(this.state.contentHtml).minutes),
-                }}
-              />
-            </label>
-          </p>
+          <EditorToolbar onSelect={insertCode} />
+          {editorInput}
         </Form.Item>
-        {this.state.contentHtml && (
+        {htmlContent && (
           <Form.Item
             label={
               <span className="Editor__label">
@@ -614,7 +324,7 @@ class Editor extends React.Component {
               </span>
             }
           >
-            <Body full body={this.state.contentHtml} />
+            <Body full body={htmlContent} />
           </Form.Item>
         )}
         <Form.Item
@@ -697,4 +407,4 @@ class Editor extends React.Component {
   }
 }
 
-export default Form.create()(Editor);
+export default Editor;
