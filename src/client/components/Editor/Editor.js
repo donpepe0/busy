@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import Helmet from 'react-helmet';
 import ReactDOM from 'react-dom';
 import readingTime from 'reading-time';
 import classNames from 'classnames';
@@ -10,6 +11,7 @@ import isArray from 'lodash/isArray';
 import { Icon, Checkbox, Form, Input, Select, Button } from 'antd';
 import Dropzone from 'react-dropzone';
 import { isValidImage, MAXIMUM_UPLOAD_SIZE } from '../../helpers/image';
+import { rewardsValues } from '../../../common/constants/rewards';
 import EditorToolbar from './EditorToolbar';
 import Action from '../Button/Action';
 import Body, { remarkable } from '../Story/Body';
@@ -43,7 +45,7 @@ class Editor extends React.Component {
     title: '',
     topics: [],
     body: '',
-    reward: '50',
+    reward: rewardsValues.half,
     upvote: true,
     recentTopics: [],
     popularTopics: [],
@@ -113,7 +115,7 @@ class Editor extends React.Component {
     }
   }
 
-  onUpdate = (e) => {
+  onUpdate = e => {
     // NOTE: antd doesn't update field value on Select before firing onChange
     // so we have to get value from event.
     const values = this.getValues(e);
@@ -127,7 +129,7 @@ class Editor extends React.Component {
     });
   };
 
-  setInput = (input) => {
+  setInput = input => {
     if (input && input.refs && input.refs.input) {
       this.originalInput = input.refs.input;
       // eslint-disable-next-line react/no-find-dom-node
@@ -135,7 +137,7 @@ class Editor extends React.Component {
     }
   };
 
-  setValues = (post) => {
+  setValues = post => {
     this.props.form.setFieldsValue({
       title: post.title,
       topics: post.topics,
@@ -149,7 +151,7 @@ class Editor extends React.Component {
     }
   };
 
-  getValues = (e) => {
+  getValues = e => {
     // NOTE: antd API is inconsistent and returns event or just value depending of input type.
     // this code extracts value from event based of event type
     // (array or just value for Select, proxy event for inputs and checkboxes)
@@ -176,7 +178,7 @@ class Editor extends React.Component {
     return values;
   };
 
-  setInputCursorPosition = (pos) => {
+  setInputCursorPosition = pos => {
     if (this.input && this.input.setSelectionRange) {
       this.input.setSelectionRange(pos, pos);
     }
@@ -190,7 +192,7 @@ class Editor extends React.Component {
   // Form validation and handling
   //
 
-  handleSubmit = (e) => {
+  handleSubmit = e => {
     // NOTE: Wrapping textarea in getFormDecorator makes it impossible
     // to control its selection what is needed for markdown formatting.
     // This code adds requirement for body input to not be empty.
@@ -239,10 +241,10 @@ class Editor extends React.Component {
   // Editor methods
   //
 
-  handlePastedImage = (e) => {
+  handlePastedImage = e => {
     if (e.clipboardData && e.clipboardData.items) {
       const items = e.clipboardData.items;
-      Array.from(items).forEach((item) => {
+      Array.from(items).forEach(item => {
         if (item.kind === 'file') {
           e.preventDefault();
 
@@ -267,7 +269,7 @@ class Editor extends React.Component {
     }
   };
 
-  handleImageChange = (e) => {
+  handleImageChange = e => {
     if (e.target.files && e.target.files[0]) {
       if (!isValidImage(e.target.files[0])) {
         this.props.onImageInvalid();
@@ -288,7 +290,7 @@ class Editor extends React.Component {
     }
   };
 
-  handleDrop = (files) => {
+  handleDrop = files => {
     if (files.length === 0) {
       this.setState({
         dropzoneActive: false,
@@ -301,7 +303,7 @@ class Editor extends React.Component {
       imageUploading: true,
     });
     let callbacksCount = 0;
-    Array.from(files).forEach((item) => {
+    Array.from(files).forEach(item => {
       this.props.onImageInserted(
         item,
         (image, imageName) => {
@@ -326,11 +328,11 @@ class Editor extends React.Component {
 
   handleDragLeave = () => this.setState({ dropzoneActive: false });
 
-  handleDelete = (e) => {
+  handleDelete = e => {
     e.stopPropagation();
     e.preventDefault();
     this.props.onDelete();
-  }
+  };
 
   insertAtCursor = (before, after, deltaStart = 0, deltaEnd = 0) => {
     if (!this.input) return;
@@ -371,7 +373,7 @@ class Editor extends React.Component {
     this.onUpdate();
   };
 
-  insertCode = (type) => {
+  insertCode = type => {
     if (!this.input) return;
     this.input.focus();
 
@@ -428,14 +430,14 @@ class Editor extends React.Component {
     bold: () => this.insertCode('b'),
     italic: () => this.insertCode('i'),
     quote: () => this.insertCode('q'),
-    link: (e) => {
+    link: e => {
       e.preventDefault();
       this.insertCode('link');
     },
     image: () => this.insertCode('image'),
   };
 
-  renderMarkdown = (value) => {
+  renderMarkdown = value => {
     this.setState({
       contentHtml: remarkable.render(value),
     });
@@ -447,6 +449,11 @@ class Editor extends React.Component {
 
     return (
       <Form className="Editor" layout="vertical" onSubmit={this.handleSubmit}>
+        <Helmet>
+          <title>
+            {intl.formatMessage({ id: 'write_post', defaultMessage: 'Write post' })} - Busy
+          </title>
+        </Helmet>
         <Form.Item
           label={
             <span className="Editor__label">
@@ -473,7 +480,7 @@ class Editor extends React.Component {
             ],
           })(
             <Input
-              ref={(title) => {
+              ref={title => {
                 this.title = title;
               }}
               onChange={this.onUpdate}
@@ -511,7 +518,7 @@ class Editor extends React.Component {
             ],
           })(
             <Select
-              ref={(ref) => {
+              ref={ref => {
                 this.select = ref;
               }}
               onChange={this.onUpdate}
@@ -618,15 +625,15 @@ class Editor extends React.Component {
             </span>
           }
         >
-          {getFieldDecorator('reward', { initialValue: '50' })(
+          {getFieldDecorator('reward', { initialValue: this.props.reward })(
             <Select onChange={this.onUpdate} disabled={isUpdating}>
-              <Select.Option value="100">
+              <Select.Option value={rewardsValues.all}>
                 <FormattedMessage id="reward_option_100" defaultMessage="100% Steem Power" />
               </Select.Option>
-              <Select.Option value="50">
+              <Select.Option value={rewardsValues.half}>
                 <FormattedMessage id="reward_option_50" defaultMessage="50% SBD and 50% SP" />
               </Select.Option>
-              <Select.Option value="0">
+              <Select.Option value={rewardsValues.none}>
                 <FormattedMessage id="reward_option_0" defaultMessage="Declined" />
               </Select.Option>
             </Select>,
@@ -654,14 +661,11 @@ class Editor extends React.Component {
               </span>
             )}
             <Form.Item className="Editor__bottom__cancel">
-              {draftId &&
-              <Button
-                type="danger"
-                disabled={loading}
-                onClick={this.handleDelete}
-              >
-                <FormattedMessage id="draft_delete" defaultMessage="Delete this draft" />
-              </Button>}
+              {draftId && (
+                <Button type="danger" disabled={loading} onClick={this.handleDelete}>
+                  <FormattedMessage id="draft_delete" defaultMessage="Delete this draft" />
+                </Button>
+              )}
             </Form.Item>
             <Form.Item className="Editor__bottom__submit">
               {isUpdating ? (

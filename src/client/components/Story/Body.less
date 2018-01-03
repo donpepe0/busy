@@ -1,10 +1,12 @@
-@import (reference) "../../styles/modules/variables.less";
-@import (reference) "../../styles/fonts.less";
+@import (reference) '../../styles/modules/variables.less';
+@import (reference) '../../styles/custom.less';
+@import (reference) '../../styles/fonts.less';
 
 .Body {
-  font-family: @font-text;
-  color: rgba(0, 0, 0, 0.8);
-  line-height: 1.6em;
+  font-family: 'Source Serif Pro', serif;
+  line-height: 1.4;
+  font-weight: 400;
+  color: @black-text;
   overflow-wrap: break-word;
   word-wrap: break-word;
   word-break: break-word;
@@ -19,6 +21,7 @@
   h4,
   h5,
   h6 {
+    font-family: @font-family;
     font-weight: 700;
   }
 
@@ -189,18 +192,15 @@
   }
 
   &:after {
-    content: "";
+    content: '';
     display: table;
     clear: both;
   }
 
   &--full {
     margin: 0;
-    font-size: 18px;
-
-    @media @small {
-      font-size: 21px;
-    }
+    font-size: 20px;
+    line-height: 1.5;
 
     p:not(:last-child) {
       margin: 0 0 1.5rem 0;

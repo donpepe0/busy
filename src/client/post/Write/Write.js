@@ -11,6 +11,7 @@ import 'url-search-params-polyfill';
 import { injectIntl } from 'react-intl';
 import uuidv4 from 'uuid/v4';
 import { MAXIMUM_UPLOAD_SIZE_HUMAN } from '../../helpers/image';
+import { rewardsValues } from '../../../common/constants/rewards';
 import GetBoost from '../../components/Sidebar/GetBoost';
 import DeleteDraftModal from './DeleteDraftModal';
 
@@ -19,6 +20,8 @@ import {
   getDraftPosts,
   getIsEditorLoading,
   getIsEditorSaving,
+  getUpvoteSetting,
+  getRewardSetting,
 } from '../../reducers';
 
 import { createPost, saveDraft, newPost } from './editorActions';
@@ -37,6 +40,8 @@ const version = require('../../../../package.json').version;
     loading: getIsEditorLoading(state),
     saving: getIsEditorSaving(state),
     draftId: new URLSearchParams(props.location.search).get('draft'),
+    upvoteSetting: getUpvoteSetting(state),
+    rewardSetting: getRewardSetting(state),
   }),
   {
     createPost,
@@ -54,6 +59,8 @@ class Write extends React.Component {
     loading: PropTypes.bool.isRequired,
     saving: PropTypes.bool,
     draftId: PropTypes.string,
+    upvoteSetting: PropTypes.bool,
+    rewardSetting: PropTypes.string,
     newPost: PropTypes.func,
     createPost: PropTypes.func,
     saveDraft: PropTypes.func,
@@ -64,6 +71,8 @@ class Write extends React.Component {
   static defaultProps = {
     saving: false,
     draftId: null,
+    upvoteSetting: true,
+    rewardSetting: rewardsValues.half,
     newPost: () => {},
     createPost: () => {},
     saveDraft: () => {},
@@ -77,8 +86,8 @@ class Write extends React.Component {
       initialTitle: '',
       initialTopics: [],
       initialBody: '',
-      initialReward: '50',
-      initialUpvote: true,
+      initialReward: this.props.rewardSetting,
+      initialUpvote: this.props.upvoteSetting,
       initialUpdatedDate: Date.now(),
       isUpdating: false,
       showModalDelete: false,
@@ -108,7 +117,7 @@ class Write extends React.Component {
         initialTitle: draftPost.title || '',
         initialTopics: tags || [],
         initialBody: draftPost.body || '',
-        initialReward: draftPost.reward || '50',
+        initialReward: draftPost.reward,
         initialUpvote: draftPost.upvote,
         initialUpdatedDate: draftPost.lastUpdated || Date.now(),
         isUpdating: draftPost.isUpdating || false,
@@ -129,7 +138,7 @@ class Write extends React.Component {
         initialTitle: '',
         initialTopics: [],
         initialBody: '',
-        initialReward: '50',
+        initialReward: rewardsValues.half,
         initialUpvote: true,
         initialUpdatedDate: Date.now(),
         isUpdating: false,
@@ -142,7 +151,7 @@ class Write extends React.Component {
 
   onDelete = () => this.setState({ showModalDelete: true });
 
-  onSubmit = (form) => {
+  onSubmit = form => {
     const data = this.getNewPostData(form);
     if (this.props.draftId) {
       data.draftId = this.props.draftId;
@@ -150,7 +159,7 @@ class Write extends React.Component {
     this.props.createPost(data);
   };
 
-  getNewPostData = (form) => {
+  getNewPostData = form => {
     const data = {
       body: form.body,
       title: form.title,
@@ -180,12 +189,12 @@ class Write extends React.Component {
 
     const renderer = new marked.Renderer();
 
-    renderer.link = (href) => {
+    renderer.link = href => {
       links.push(href);
       return marked.Renderer.prototype.link.apply(renderer, arguments);
     };
 
-    renderer.image = (href) => {
+    renderer.image = href => {
       images.push(href);
       return marked.Renderer.prototype.image.apply(renderer, arguments);
     };
@@ -222,7 +231,7 @@ class Write extends React.Component {
       metaData.users = users;
     }
     if (links.length) {
-      metaData.links = links;
+      metaData.links = links.slice(0, 10);
     }
     if (images.length) {
       metaData.image = images;
@@ -282,7 +291,7 @@ class Write extends React.Component {
 
   handleCancelDeleteDraft = () => this.setState({ showModalDelete: false });
 
-  saveDraft = debounce((form) => {
+  saveDraft = debounce(form => {
     const data = this.getNewPostData(form);
     const postBody = data.body;
     const id = this.props.draftId;

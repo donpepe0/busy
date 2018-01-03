@@ -3,9 +3,7 @@ import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { Helmet } from 'react-helmet';
 
-import {
-  getFeedContentAsync,
-} from './feedActions';
+import { getFeedContentAsync } from './feedActions';
 import { getIsLoaded, getIsAuthenticated } from '../reducers';
 import SubFeed from './SubFeed';
 import HeroBannerContainer from './HeroBannerContainer';
@@ -35,7 +33,7 @@ class Page extends React.Component {
     return getFeedContentAsync(store, { sortBy, category, limit: 10 });
   }
 
-  handleSortChange = (key) => {
+  handleSortChange = key => {
     const { category } = this.props.match.params;
     if (category) {
       this.props.history.push(`/${key}/${category}`);
@@ -48,15 +46,17 @@ class Page extends React.Component {
 
   render() {
     const { authenticated, loaded, location, match } = this.props;
+    const { category, sortBy } = match.params;
 
     const shouldDisplaySelector = location.pathname !== '/' || (!authenticated && loaded);
 
-    const { category, sortBy } = match.params;
+    const robots = location.pathname === '/' ? 'index,follow' : 'noindex,follow';
 
     return (
       <div>
         <Helmet>
           <title>Busy</title>
+          <meta name="robots" content={robots} />
         </Helmet>
         <ScrollToTop />
         <ScrollToTopOnMount />
@@ -78,7 +78,7 @@ class Page extends React.Component {
                 <TopicSelector
                   isSingle={false}
                   sort={sortBy}
-                  topics={(category) ? [category] : []}
+                  topics={category ? [category] : []}
                   onSortChange={this.handleSortChange}
                   onTopicClose={this.handleTopicClose}
                 />

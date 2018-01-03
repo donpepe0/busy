@@ -113,7 +113,7 @@ export default class Feed extends React.Component {
 
   handleSaveClick = post => this.props.toggleBookmark(post.id, post.author, post.permlink);
 
-  handleFollowClick = (post) => {
+  handleFollowClick = post => {
     const isFollowed = this.props.followingList.includes(post.author);
     if (isFollowed) {
       this.props.unfollowUser(post.author);
@@ -152,9 +152,9 @@ export default class Feed extends React.Component {
         loadingMore={isFetching}
         hasMore={hasMore}
         elementIsScrollable={false}
-        threshold={200}
+        threshold={1500}
       >
-        {content.map((post) => {
+        {content.map(post => {
           const userVote = _.find(post.active_votes, { voter: user.name }) || {};
 
           const postState = {

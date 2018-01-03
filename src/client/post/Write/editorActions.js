@@ -4,7 +4,9 @@ import { push } from 'react-router-redux';
 import { createAction } from 'redux-actions';
 import { addDraftMetadata, deleteDraftMetadata } from '../../helpers/metadata';
 import { jsonParse } from '../../helpers/formatter';
+import { rewardsValues } from '../../../common/constants/rewards';
 import { createPermlink, getBodyPatchIfSmaller } from '../../vendor/steemitHelpers';
+import { saveSettings } from '../../settings/settingsActions';
 
 export const CREATE_POST = '@editor/CREATE_POST';
 export const CREATE_POST_START = '@editor/CREATE_POST_START';
@@ -30,7 +32,7 @@ export const addEditedPost = createAction(ADD_EDITED_POST);
 export const DELETE_EDITED_POST = '@editor/DELETE_EDITED_POST';
 export const deleteEditedPost = createAction(DELETE_EDITED_POST);
 
-export const saveDraft = (post, redirect) => (dispatch) => {
+export const saveDraft = (post, redirect) => dispatch => {
   if (redirect) dispatch(push(`/editor?draft=${post.id}`));
   return dispatch({
     type: SAVE_DRAFT,
@@ -50,7 +52,7 @@ export const deleteDraft = draftId => dispatch =>
     meta: { id: draftId },
   });
 
-export const editPost = post => (dispatch) => {
+export const editPost = post => dispatch => {
   const jsonMetadata = jsonParse(post.json_metadata);
   const draft = {
     ...post,
@@ -104,23 +106,24 @@ const broadcastComment = (
     percent_steem_dollars: 10000,
   };
 
-  if (reward === '0') {
+  if (reward === rewardsValues.none) {
     commentOptionsConfig.max_accepted_payout = '0.000 SBD';
-  } else if (reward === '100') {
+  } else if (reward === rewardsValues.all) {
     commentOptionsConfig.percent_steem_dollars = 0;
   }
 
   if (referral) {
     commentOptionsConfig.extensions = [
-      [0, {
-        beneficiaries: [
-          { account: referral, weight: 1000 },
-        ],
-      }],
+      [
+        0,
+        {
+          beneficiaries: [{ account: referral, weight: 1000 }],
+        },
+      ],
     ];
   }
 
-  if (reward === '0' || reward === '100' || referral) {
+  if (reward === rewardsValues.none || reward === rewardsValues.all || referral) {
     operations.push(['comment_options', commentOptionsConfig]);
   }
 
@@ -140,7 +143,7 @@ const broadcastComment = (
 };
 
 export function createPost(postData) {
-  requiredFields.forEach((field) => {
+  requiredFields.forEach(field => {
     assert(postData[field] != null, `Developer Error: Missing required field ${field}`);
   });
 
@@ -163,9 +166,16 @@ export function createPost(postData) {
 
     const newBody = isUpdating ? getBodyPatchIfSmaller(postData.originalBody, body) : body;
 
+    dispatch(saveSettings({ upvoteSetting: upvote, rewardSetting: reward }));
+
     let referral;
     if (Cookie.get('referral')) {
-      const accountCreatedDaysAgo = (new Date().getTime() - new Date(`${getState().auth.user.created}Z`).getTime()) / 1000 / 60 / 60 / 24;
+      const accountCreatedDaysAgo =
+        (new Date().getTime() - new Date(`${getState().auth.user.created}Z`).getTime()) /
+        1000 /
+        60 /
+        60 /
+        24;
       if (accountCreatedDaysAgo < 30) {
         referral = Cookie.get('referral');
       }
@@ -187,7 +197,7 @@ export function createPost(postData) {
             !isUpdating && upvote,
             permlink,
             referral,
-          ).then((result) => {
+          ).then(result => {
             if (draftId) {
               dispatch(deleteDraft(draftId));
               dispatch(addEditedPost(permlink));
